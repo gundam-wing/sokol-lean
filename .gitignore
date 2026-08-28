@@ -1,0 +1,9 @@
+.lake
+result
+result-*
+.direnv
+*.olean
+*.ilean
+*~
+.DS_Store
+/tmp
