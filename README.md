@@ -38,7 +38,7 @@ Sokol selects a 3D API at C compile time. Pass `-Kbackend=...`:
 | `dummy` | `SOKOL_DUMMY_BACKEND` for gfx (no GPU; for tests). Window code still uses the platform 3D API because `sokol_app` has no dummy backend on Linux. |
 | `glcore` / `metal` / `d3d11` / `gles3` | that backend |
 
-Rebuild after changing the backend (`lake clean` if object files were built for a different one). `-K` is a Lake *global* option, so it goes before the subcommand:
+Rebuild after changing the backend. Lake caches `-K` options in `.lake/config`, so use `lake -R -Kbackend=...` (or `lake clean` then rebuild) when switching; otherwise native objects can keep the old `SOKOL_*` define and windowed apps stay black. `-K` is a Lake *global* option, so it goes before the subcommand:
 
 ```sh
 lake -Kbackend=dummy build dummyTest
