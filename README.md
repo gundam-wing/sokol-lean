@@ -7,7 +7,7 @@ Lean 4 bindings for [Sokol](https://github.com/floooh/sokol). Two layers, no ext
 | FFI | `Sokol.FFI` | Thin `extern`s, resource ids, C enumerator values |
 | Graphics | `Sokol.App`, `Sokol.Gfx` | Defaults, `IO` callbacks, f32 packing, pass helpers |
 
-Sokol itself is vendored (header-only, zlib). The Nix flake provides Lean from `lean-toolchain` plus the native window/GL libraries the C side links against.
+Sokol itself is vendored (header-only, zlib). The Nix flake provides [elan](https://github.com/leanprover/elan) (which installs the Lean in `lean-toolchain`) plus Linux window/GL libraries.
 
 ## Requirements
 
@@ -16,13 +16,15 @@ Sokol itself is vendored (header-only, zlib). The Nix flake provides Lean from `
 - On macOS: Cocoa / QuartzCore / Metal (linked automatically)
 
 ```sh
-nix develop          # Lean, lake, and native libs
-lake -Klibdir="$SOKOL_LEAN_LIBDIR" build
-lake -Klibdir="$SOKOL_LEAN_LIBDIR" build triangle
-lake -Kbackend=dummy -Klibdir="$SOKOL_LEAN_LIBDIR" test
+nix develop          # elan + lake/lean from lean-toolchain
+lake build
+lake exe triangle    # opens a window titled "sokol-lean triangle"; Escape quits
+lake -Kbackend=dummy test
 ```
 
-Without Nix, install [elan](https://github.com/leanprover/elan) and the Linux X11/GL packages, then run `lake build` / `lake -Kbackend=dummy test`.
+`lake build triangle` only compiles. Run the binary (`lake exe triangle` or `.lake/build/bin/triangle`) to get a window. On macOS it may open behind the terminal; check the Dock for `triangle`. The flake sets `LEAN_MAIN_USE_THREAD=0` so Sokol can create a Cocoa window (Lean otherwise runs `main` off the process main thread).
+
+Without Nix, install elan yourself, then run the same `lake` commands. On Linux, pass `-Klibdir="$SOKOL_LEAN_LIBDIR"` if you need Nix-provided GL/X11.
 
 On Nix, `-Klibdir` is the search path for `libGL` / `libX11` (do not pass `/usr/lib`; that can shadow Lean's sysroot libc). The flake `devShell` sets `SOKOL_LEAN_LIBDIR`.
 

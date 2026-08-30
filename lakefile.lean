@@ -41,11 +41,16 @@ def linuxLibs : Array String :=
     #[s!"{d}/libGL.so", s!"{d}/libX11.so", s!"{d}/libXi.so", s!"{d}/libXcursor.so",
       "-lm", "-ldl", "-lpthread"]
 
+def darwinSdk : FilePath :=
+  "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
+
 def linkArgs : Array String :=
   if Platform.isWindows then
     #[]
   else if Platform.isOSX then
-    #["-framework", "Cocoa", "-framework", "QuartzCore",
+    -- Lean's bundled lld does not search the Apple SDK unless syslibroot is set.
+    #["-Wl,-syslibroot," ++ darwinSdk.toString,
+      "-framework", "Cocoa", "-framework", "QuartzCore",
       "-framework", "Metal", "-framework", "MetalKit"]
   else
     linuxLibs
@@ -53,8 +58,23 @@ def linkArgs : Array String :=
 def commonTraceArgs : Array String :=
   #["-fPIC", "-O2"]
 
-def objcArgs : Array String :=
-  if Platform.isOSX then #["-x", "objective-c"] else #[]
+/-- `compileO` appends flags *after* the source file, so `-x objective-c` would be ignored. -/
+def compileSokolO (oFile srcFile : FilePath) (moreArgs : Array String) : LogIO Unit := do
+  createParentDirs oFile
+  let lang := if Platform.isOSX then #["-x", "objective-c"] else (#[] : Array String)
+  proc {
+    cmd := "cc"
+    args := lang ++ #["-c", "-o", oFile.toString, srcFile.toString] ++ moreArgs
+  }
+
+def buildSokolO (oFile : FilePath) (srcJob : Job FilePath)
+    (weakArgs traceArgs : Array String) : SpawnM (Job FilePath) :=
+  srcJob.mapM fun srcFile => do
+    addPlatformTrace
+    addPureTrace traceArgs "traceArgs"
+    let art ← buildArtifactUnlessUpToDate oFile (ext := "o") do
+      compileSokolO oFile srcFile (weakArgs ++ traceArgs)
+    return art.path
 
 package «sokol» where
   testDriver := "dummyTest"
@@ -66,14 +86,14 @@ def nativeWeakArgs (pkg : Package) : Array String :=
 target sokolGfxO pkg : FilePath := do
   let srcJob ← inputTextFile (pkg.dir / "native" / "sokol_gfx_impl.c")
   let oFile := pkg.buildDir / "native" / "sokol_gfx_impl.o"
-  buildO oFile srcJob (nativeWeakArgs pkg)
-    (commonTraceArgs ++ #[s!"-D{gfxBackendMacro}"] ++ objcArgs)
+  buildSokolO oFile srcJob (nativeWeakArgs pkg)
+    (commonTraceArgs ++ #[s!"-D{gfxBackendMacro}"])
 
 target sokolAppO pkg : FilePath := do
   let srcJob ← inputTextFile (pkg.dir / "native" / "sokol_app_impl.c")
   let oFile := pkg.buildDir / "native" / "sokol_app_impl.o"
-  buildO oFile srcJob (nativeWeakArgs pkg)
-    (commonTraceArgs ++ #["-DSOKOL_NO_ENTRY", s!"-D{appBackendMacro}"] ++ objcArgs)
+  buildSokolO oFile srcJob (nativeWeakArgs pkg)
+    (commonTraceArgs ++ #["-DSOKOL_NO_ENTRY", s!"-D{appBackendMacro}"])
 
 target sokolFfiO pkg : FilePath := do
   let srcJob ← inputTextFile (pkg.dir / "native" / "ffi.c")

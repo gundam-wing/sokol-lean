@@ -3,6 +3,18 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#if defined(__APPLE__)
+/*
+ * Lean 4's `lean_run_main` hops onto a worker thread (`LEAN_MAIN_USE_THREAD`).
+ * AppKit will not create a window there; `[NSApp run]` just throws in a tight loop.
+ * This must be set before `main` so `getenv` sees it.
+ */
+__attribute__((constructor))
+static void sokol_lean_macos_main_thread(void) {
+  setenv("LEAN_MAIN_USE_THREAD", "0", 1);
+}
+#endif
+
 /* -------------------------------------------------------------------------- */
 /* Time                                                                        */
 /* -------------------------------------------------------------------------- */

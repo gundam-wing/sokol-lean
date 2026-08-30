@@ -20,6 +20,43 @@ def fsGL : String :=
      frag_color = color;\n\
    }\n"
 
+def vsMetal : String :=
+  "#include <metal_stdlib>\n\
+   using namespace metal;\n\
+   struct vs_in {\n\
+     float4 position [[attribute(0)]];\n\
+     float4 color0 [[attribute(1)]];\n\
+   };\n\
+   struct vs_out {\n\
+     float4 position [[position]];\n\
+     float4 color;\n\
+   };\n\
+   vertex vs_out _main(vs_in in [[stage_in]]) {\n\
+     vs_out out;\n\
+     out.position = in.position;\n\
+     out.color = in.color0;\n\
+     return out;\n\
+   }\n"
+
+def fsMetal : String :=
+  "#include <metal_stdlib>\n\
+   using namespace metal;\n\
+   struct fs_in {\n\
+     float4 color;\n\
+   };\n\
+   fragment float4 _main(fs_in in [[stage_in]]) {\n\
+     return in.color;\n\
+   }\n"
+
+def shaderDesc (backend : Backend) : Gfx.ShaderDesc :=
+  -- `sg_backend`: GLCORE=0 GLES3=1, Metal=3..5
+  if backend.val ≤ 1 then
+    { vertex := vsGL, fragment := fsGL, attrNames := #["position", "color0"] }
+  else if backend.val ≥ 3 && backend.val ≤ 5 then
+    { vertex := vsMetal, fragment := fsMetal }
+  else
+    { vertex := vsGL, fragment := fsGL, attrNames := #["position", "color0"] }
+
 structure State where
   pip : Pipeline := ⟨0⟩
   vbuf : Buffer := ⟨0⟩
@@ -40,11 +77,7 @@ def main : IO Unit := do
     init := do
       Gfx.setup
       let vbuf ← Gfx.Buffer.ofFloats vertices
-      let shd ← Gfx.Shader.make {
-        vertex := vsGL
-        fragment := fsGL
-        attrNames := #["position", "color0"]
-      }
+      let shd ← Gfx.Shader.make (shaderDesc (← Gfx.backend))
       let pip ← Gfx.Pipeline.make {
         shader := shd
         attrs := #[.float3, .float4]
